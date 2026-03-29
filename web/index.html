@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valve Controller</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #4fc3f7;
+        }
+        .status-bar {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            text-align: center;
+            min-width: 320px;
+        }
+        .status-bar .state {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .state.idle { color: #81c784; }
+        .state.active { color: #ffb74d; }
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #fff;
+            margin: 5px 0;
+            font-variant-numeric: tabular-nums;
+        }
+        .zones {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .zone-card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #2a2a4a;
+            transition: all 0.3s;
+        }
+        .zone-card.active {
+            border-color: #4fc3f7;
+            background: #1a2744;
+        }
+        .zone-card h3 {
+            font-size: 1rem;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        .zone-card .zone-num {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        .zone-card.active .zone-num { color: #ffb74d; }
+        .zone-card button {
+            margin-top: 10px;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-open {
+            background: #4caf50;
+            color: white;
+        }
+        .btn-open:hover { background: #388e3c; }
+        .btn-open:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .btn-close {
+            background: #f44336;
+            color: white;
+        }
+        .btn-close:hover { background: #c62828; }
+        .duration-input {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .duration-input input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #0f3460;
+            color: #eee;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .duration-input label {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .log {
+            margin-top: 20px;
+            background: #0f0f23;
+            border-radius: 8px;
+            padding: 10px;
+            max-width: 400px;
+            width: 100%;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .log .entry { margin: 2px 0; }
+        .log .entry.open { color: #4caf50; }
+        .log .entry.close { color: #f44336; }
+        .log .entry.error { color: #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>Valve Controller</h1>
+
+    <div class="status-bar">
+        <div class="state idle" id="state">IDLE</div>
+        <div class="timer" id="timer">--:--</div>
+    </div>
+
+    <div class="zones" id="zones"></div>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        const BASE = '';
+        let pollInterval;
+        let currentStatus = null;
+
+        function log(msg, cls) {
+            const el = document.getElementById('log');
+            const t = new Date().toLocaleTimeString();
+            el.innerHTML = `<div class="entry ${cls || ''}">[${t}] ${msg}</div>` + el.innerHTML;
+        }
+
+        async function fetchStatus() {
+            try {
+                const r = await fetch(`${BASE}/api/status`);
+                currentStatus = await r.json();
+                updateUI(currentStatus);
+            } catch (e) {
+                document.getElementById('state').textContent = 'CONNECTION ERROR';
+                document.getElementById('state').className = 'state';
+            }
+        }
+
+        function updateUI(s) {
+            const stateEl = document.getElementById('state');
+            const timerEl = document.getElementById('timer');
+
+            if (s.active) {
+                stateEl.textContent = `ZONE ${s.active_zone} ACTIVE`;
+                stateEl.className = 'state active';
+                const rem = Math.ceil(s.remaining_seconds);
+                const m = Math.floor(rem / 60);
+                const sec = rem % 60;
+                timerEl.textContent = `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+            } else {
+                stateEl.textContent = 'IDLE';
+                stateEl.className = 'state idle';
+                timerEl.textContent = '--:--';
+            }
+
+            renderZones(s);
+        }
+
+        function renderZones(s) {
+            const container = document.getElementById('zones');
+            if (container.children.length === s.zones.length) {
+                s.zones.forEach(z => {
+                    const card = document.getElementById(`zone-${z}`);
+                    if (!card) return;
+                    const isActive = s.active && s.active_zone === z;
+                    card.className = `zone-card${isActive ? ' active' : ''}`;
+                    const openBtn = card.querySelector('.btn-open');
+                    const closeBtn = card.querySelector('.btn-close');
+                    if (openBtn) openBtn.disabled = s.active;
+                    if (closeBtn) closeBtn.style.display = isActive ? 'inline-block' : 'none';
+                });
+                return;
+            }
+
+            container.innerHTML = '';
+            s.zones.forEach(z => {
+                const isActive = s.active && s.active_zone === z;
+                const card = document.createElement('div');
+                card.id = `zone-${z}`;
+                card.className = `zone-card${isActive ? ' active' : ''}`;
+                card.innerHTML = `
+                    <h3>Zone</h3>
+                    <div class="zone-num">${z}</div>
+                    <div class="duration-input">
+                        <label>sec:</label>
+                        <input type="number" id="dur-${z}" value="60" min="1" max="3600">
+                    </div>
+                    <button class="btn-open" onclick="openValve('${z}')" ${s.active ? 'disabled' : ''}>OPEN</button>
+                    <button class="btn-close" onclick="closeValve('${z}')" style="display:${isActive ? 'inline-block' : 'none'}">CLOSE</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function openValve(zone) {
+            const dur = document.getElementById(`dur-${zone}`).value;
+            if (!dur || dur <= 0) { log('Invalid duration', 'error'); return; }
+            try {
+                const r = await fetch(`${BASE}/api/valve/${zone}/open?duration=${dur}`, {method: 'POST'});
+                const d = await r.json();
+                if (d.success) {
+                    log(`Zone ${zone} opened for ${dur}s`, 'open');
+                } else {
+                    log(`${d.message}: ${JSON.stringify(d)}`, 'error');
+                }
+                fetchStatus();
+            } catch (e) {
+                log('Request failed: ' + e, 'error');
+            }
+        }
+
+        async function closeValve(zone) {
+            try {
+                const r = await fetch(`${BASE}/api/valve/${zone}/close`, {method: 'POST'});
+                const d = await r.json();
+                if (d.success) {
+                    log(`Zone ${zone} closed`, 'close');
+                } else {
+                    log(`${d.message}`, 'error');
+                }
+                fetchStatus();
+            } catch (e) {
+                log('Request failed: ' + e, 'error');
+            }
+        }
+
+        fetchStatus();
+        pollInterval = setInterval(fetchStatus, 1000);
+    </script>
+</body>
+</html>
