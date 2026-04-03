@@ -2,40 +2,48 @@ import logging
 
 logger = logging.getLogger("valve-controller")
 
+DEVICE_BUS = 1
+DEVICE_ADDR = 0x10
+RELAY_ON = 0xFF
+RELAY_OFF = 0x00
+
+
+def build_zone_registers(num_zones: int) -> dict:
+    """Generate zone register map: {"1": 1, "2": 2, ...} for num_zones zones."""
+    return {str(i): i for i in range(1, num_zones + 1)}
+
 try:
-    import RPi.GPIO as GPIO
-    GPIO_AVAILABLE = True
-except (ImportError, RuntimeError):
-    GPIO_AVAILABLE = False
-    logger.warning("RPi.GPIO not available - running in simulation mode")
+    from smbus2 import SMBus
+    I2C_AVAILABLE = True
+except ImportError:
+    try:
+        from smbus import SMBus
+        I2C_AVAILABLE = True
+    except ImportError:
+        I2C_AVAILABLE = False
+        logger.warning("smbus/smbus2 not available - running in simulation mode")
 
 
 class RelayController:
-    """Low-level relay hardware control via GPIO."""
+    """Low-level relay hardware control via I2C (GeeekPi EP-0099)."""
 
-    def __init__(self, relay_pins, active_low=True):
-        """
-        relay_pins: dict mapping zone str ("1"-"4") to BCM GPIO pin number
-        active_low: if True, LOW=relay ON, HIGH=relay OFF
-        """
-        self.relay_pins = {str(k): int(v) for k, v in relay_pins.items()}
-        self.active_low = active_low
+    def __init__(self, i2c_address=DEVICE_ADDR, num_zones=4):
+        self.i2c_address = i2c_address
+        self._bus = None
         self._initialized = False
+        self._zone_registers = build_zone_registers(num_zones)
 
     def initialize(self):
-        """Set up GPIO pins as outputs, all relays OFF."""
-        if not GPIO_AVAILABLE:
-            logger.info("Simulation mode: GPIO not initialized")
+        """Open I2C bus and turn all relays OFF."""
+        if not I2C_AVAILABLE:
+            logger.info("Simulation mode: I2C not available")
             self._initialized = True
             return
 
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setwarnings(False)
-
-        off_state = GPIO.HIGH if self.active_low else GPIO.LOW
-        for zone, pin in self.relay_pins.items():
-            GPIO.setup(pin, GPIO.OUT, initial=off_state)
-            logger.info(f"Initialized zone {zone} on GPIO {pin} (OFF)")
+        self._bus = SMBus(DEVICE_BUS)
+        for zone, reg in self._zone_registers.items():
+            self._bus.write_byte_data(self.i2c_address, reg, RELAY_OFF)
+            logger.info(f"Initialized zone {zone} register 0x{reg:02x} (OFF)")
 
         self._initialized = True
 
@@ -44,39 +52,34 @@ class RelayController:
         zone: str ("1"-"4")
         on: True = relay energized (valve open), False = relay off (valve closed)
         """
-        if zone not in self.relay_pins:
+        if zone not in self._zone_registers:
             raise ValueError(f"Unknown zone: {zone}")
 
-        pin = self.relay_pins[zone]
+        reg = self._zone_registers[zone]
+        value = RELAY_ON if on else RELAY_OFF
+        state_str = "ON" if on else "OFF"
 
-        if not GPIO_AVAILABLE:
-            state_str = "ON" if on else "OFF"
-            logger.info(f"Simulation: zone {zone} GPIO {pin} -> {state_str}")
+        if not I2C_AVAILABLE or self._bus is None:
+            logger.info(f"Simulation: zone {zone} reg 0x{reg:02x} -> {state_str}")
             return
 
-        if on:
-            level = GPIO.LOW if self.active_low else GPIO.HIGH
-        else:
-            level = GPIO.HIGH if self.active_low else GPIO.LOW
-
-        GPIO.output(pin, level)
-        state_str = "ON" if on else "OFF"
-        logger.info(f"Zone {zone} GPIO {pin} -> {state_str}")
+        self._bus.write_byte_data(self.i2c_address, reg, value)
+        logger.info(f"Zone {zone} reg 0x{reg:02x} -> {state_str}")
 
     def all_off(self):
         """Turn all relays OFF (safety)."""
-        for zone in self.relay_pins:
+        for zone in self._zone_registers:
             self.set_relay(zone, False)
 
     def cleanup(self):
-        """Release GPIO resources."""
+        """Release I2C resources."""
         self.all_off()
-        if GPIO_AVAILABLE:
-            GPIO.cleanup()
-            logger.info("GPIO cleanup complete")
+        if self._bus is not None:
+            self._bus.close()
+            logger.info("I2C bus closed")
         self._initialized = False
 
     @property
     def zones(self):
         """Return list of available zone names."""
-        return sorted(self.relay_pins.keys())
+        return sorted(self._zone_registers.keys(), key=int)

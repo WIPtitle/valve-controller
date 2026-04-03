@@ -18,10 +18,9 @@ logger = logging.getLogger("valve-controller")
 def main():
     config = ConfigManager()
     logger.info(f"Starting Valve Controller on port {config.port}")
-    logger.info(f"Relay pins: {config.relay_pins}")
-    logger.info(f"Active low: {config.active_low}")
+    logger.info(f"I2C address: 0x{config.i2c_address:02x}")
 
-    relay = RelayController(config.relay_pins, config.active_low)
+    relay = RelayController(config.i2c_address, num_zones=config.num_zones)
     relay.initialize()
 
     controller = ValveController(relay)
@@ -36,8 +35,8 @@ def main():
     signal.signal(signal.SIGTERM, shutdown_handler)
     signal.signal(signal.SIGINT, shutdown_handler)
 
+    ThreadingTCPServer.allow_reuse_address = True
     server = ThreadingTCPServer(("0.0.0.0", config.port), ValveRequestHandler)
-    server.allow_reuse_address = True
 
     logger.info(f"Valve Controller listening on http://0.0.0.0:{config.port}")
     try:

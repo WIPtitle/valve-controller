@@ -3,14 +3,9 @@ import os
 
 DEFAULT_CONFIG_PATH = "/etc/valve-controller/config.json"
 DEFAULT_CONFIG = {
-    "port": 8890,
-    "relay_pins": {
-        "1": 21,
-        "2": 20,
-        "3": 16,
-        "4": 12
-    },
-    "active_low": True
+    "port": 8686,
+    "i2c_address": "0x10",
+    "num_zones": 4
 }
 
 
@@ -40,12 +35,15 @@ class ConfigManager:
         return self.config.get("port", DEFAULT_CONFIG["port"])
 
     @property
-    def relay_pins(self):
-        return self.config.get("relay_pins", DEFAULT_CONFIG["relay_pins"])
+    def num_zones(self):
+        return self.config.get("num_zones", DEFAULT_CONFIG["num_zones"])
 
     @property
-    def active_low(self):
-        return self.config.get("active_low", DEFAULT_CONFIG["active_low"])
+    def i2c_address(self):
+        addr = self.config.get("i2c_address", DEFAULT_CONFIG["i2c_address"])
+        if isinstance(addr, str):
+            return int(addr, 16)
+        return addr
 
     def save(self):
         save_config(self.config, self.config_path)
