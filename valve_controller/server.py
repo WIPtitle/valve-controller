@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import queue
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -51,6 +52,11 @@ class ValveRequestHandler(BaseHTTPRequestHandler):
         elif path == "/api/status":
             status = self.controller.get_status()
             self._send_json(200, status)
+        elif path == "/api/config":
+            zones = self.controller.relay.zones
+            self._send_json(200, {"zones": zones, "num_zones": len(zones)})
+        elif path == "/events":
+            self._handle_sse()
         else:
             self._send_json(404, {"error": "Not found"})
 
@@ -92,6 +98,38 @@ class ValveRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(404, {"error": "Not found"})
+
+    def _handle_sse(self):
+        """Server-Sent Events endpoint for real-time zone status updates."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+        q = self.controller.subscribe()
+        try:
+            # Send initial status as an event
+            status = self.controller.get_status()
+            init_event = f"event: init\ndata: {json.dumps(status)}\n\n"
+            self.wfile.write(init_event.encode("utf-8"))
+            self.wfile.flush()
+
+            while True:
+                try:
+                    message = q.get(timeout=30)
+                    event = f"data: {message}\n\n"
+                    self.wfile.write(event.encode("utf-8"))
+                    self.wfile.flush()
+                except queue.Empty:
+                    # Send keepalive comment
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            self.controller.unsubscribe(q)
 
     def _serve_dashboard(self):
         web_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web")

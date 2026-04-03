@@ -1,6 +1,8 @@
 import threading
 import time
 import logging
+import json
+import queue as queue_module
 
 logger = logging.getLogger("valve-controller")
 
@@ -15,6 +17,32 @@ class ValveController:
         self._active_timer = None
         self._open_time = None
         self._duration = None
+        self._subscribers = []
+
+    def subscribe(self):
+        """Create a queue for SSE events and register it."""
+        q = queue_module.Queue()
+        self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q):
+        """Remove a queue from the subscriber list."""
+        try:
+            self._subscribers.remove(q)
+        except ValueError:
+            pass
+
+    def _notify_subscribers(self, event_data: dict):
+        """Push a JSON event to all subscriber queues (non-blocking)."""
+        message = json.dumps(event_data)
+        dead = []
+        for q in list(self._subscribers):
+            try:
+                q.put_nowait(message)
+            except queue_module.Full:
+                dead.append(q)
+        for q in dead:
+            self.unsubscribe(q)
 
     def open_valve(self, zone, duration):
         """Open a valve for a given duration (seconds).
@@ -45,7 +73,9 @@ class ValveController:
             self._active_timer.start()
 
             logger.info(f"Valve zone {zone} OPENED for {duration}s")
-            return True, 200, "Opened", {"zone": zone, "duration": duration}
+
+        self._notify_subscribers({"event": "valve_change", "zone": zone, "state": "open"})
+        return True, 200, "Opened", {"zone": zone, "duration": duration}
 
     def close_valve(self, zone=None):
         """Close the active valve (optionally verify zone matches).
@@ -79,10 +109,16 @@ class ValveController:
         self._duration = None
 
         logger.info(f"Valve zone {zone} CLOSED after {elapsed:.1f}s")
+        threading.Thread(
+            target=self._notify_subscribers,
+            args=({"event": "valve_change", "zone": zone, "state": "closed"},),
+            daemon=True
+        ).start()
         return True, 200, "Closed", {"zone": zone, "elapsed_seconds": round(elapsed, 1)}
 
     def _auto_close(self):
         """Called by timer when duration expires."""
+        zone = None
         with self._lock:
             if self._active_zone is not None:
                 zone = self._active_zone
@@ -92,6 +128,8 @@ class ValveController:
                 self._open_time = None
                 self._duration = None
                 self._active_timer = None
+        if zone is not None:
+            self._notify_subscribers({"event": "valve_change", "zone": zone, "state": "closed"})
 
     def get_status(self):
         """Return current state."""
