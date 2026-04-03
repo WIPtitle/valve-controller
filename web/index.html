@@ -3,243 +3,397 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Valve Controller</title>
+    <title>[ VALVE CONTROLLER ]</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #1a1a2e;
-            color: #eee;
+            font-family: 'Courier New', Courier, monospace;
+            background: #1a1a1a;
+            color: #0f0;
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             padding: 20px;
         }
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 10px;
-            color: #4fc3f7;
-        }
-        .status-bar {
-            background: #16213e;
-            border-radius: 10px;
-            padding: 15px 25px;
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 20px;
-            text-align: center;
-            min-width: 320px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
         }
-        .status-bar .state {
-            font-size: 1.2rem;
-            font-weight: bold;
+
+        h1 {
+            font-size: 1.4rem;
+            color: #0f0;
+            letter-spacing: 2px;
         }
-        .state.idle { color: #81c784; }
-        .state.active { color: #ffb74d; }
-        .timer {
-            font-size: 2rem;
+
+        #connection-indicator {
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border: 1px solid #0f0;
+            border-radius: 3px;
+            color: #0f0;
+        }
+
+        #connection-indicator.offline {
+            border-color: #f00;
+            color: #f00;
+        }
+
+        .panel {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .panel-title {
+            font-size: 0.75rem;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        /* Status bar */
+        #status-bar {
+            background: #030;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #status-bar.active {
+            background: #300;
+            border-color: #f00;
+        }
+
+        #status-bar.active #status-text { color: #f84; }
+
+        #status-text {
+            font-size: 1rem;
             font-weight: bold;
-            color: #fff;
-            margin: 5px 0;
+            color: #0f0;
+            letter-spacing: 1px;
+        }
+
+        #timer {
+            font-size: 1.6rem;
+            font-weight: bold;
             font-variant-numeric: tabular-nums;
+            color: #0f0;
         }
-        .zones {
+
+        #status-bar.active #timer { color: #f84; }
+
+        /* Zone grid */
+        #zones {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            max-width: 400px;
-            width: 100%;
+            gap: 12px;
         }
-        .zone-card {
-            background: #16213e;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            border: 2px solid #2a2a4a;
-            transition: all 0.3s;
+
+        .zone-panel {
+            background: #0a0a0a;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 14px;
         }
-        .zone-card.active {
-            border-color: #4fc3f7;
-            background: #1a2744;
+
+        .zone-panel.active {
+            border-color: #0f0;
+            background: #020a02;
         }
-        .zone-card h3 {
-            font-size: 1rem;
-            color: #aaa;
-            margin-bottom: 8px;
+
+        .zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
         }
-        .zone-card .zone-num {
-            font-size: 2rem;
+
+        .zone-number {
+            font-size: 1.1rem;
             font-weight: bold;
-            color: #4fc3f7;
+            color: #0f0;
         }
-        .zone-card.active .zone-num { color: #ffb74d; }
-        .zone-card button {
-            margin-top: 10px;
-            padding: 8px 20px;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-        .btn-open {
-            background: #4caf50;
-            color: white;
-        }
-        .btn-open:hover { background: #388e3c; }
-        .btn-open:disabled {
-            background: #555;
-            cursor: not-allowed;
-        }
-        .btn-close {
-            background: #f44336;
-            color: white;
-        }
-        .btn-close:hover { background: #c62828; }
-        .duration-input {
-            margin-top: 8px;
+
+        .zone-status {
+            font-size: 0.75rem;
             display: flex;
             align-items: center;
-            justify-content: center;
             gap: 5px;
         }
-        .duration-input input {
-            width: 60px;
-            padding: 5px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            background: #0f3460;
-            color: #eee;
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #333;
+            display: inline-block;
+        }
+
+        .zone-panel.active .dot {
+            background: #0f0;
+            box-shadow: 0 0 6px #0f0;
+        }
+
+        .zone-status-text {
+            color: #555;
+        }
+
+        .zone-panel.active .zone-status-text {
+            color: #0f0;
+        }
+
+        .zone-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .duration-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        .duration-row input {
+            width: 65px;
+            padding: 4px 6px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 3px;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8rem;
             text-align: center;
-            font-size: 0.9rem;
         }
-        .duration-input label {
+
+        .duration-row input:focus {
+            outline: none;
+            border-color: #0f0;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        button {
+            padding: 6px 14px;
+            background: #222;
+            border: 1px solid #0f0;
+            color: #0f0;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
             font-size: 0.8rem;
-            color: #888;
+            cursor: pointer;
+            transition: background 0.15s;
         }
-        .log {
-            margin-top: 20px;
-            background: #0f0f23;
-            border-radius: 8px;
-            padding: 10px;
-            max-width: 400px;
-            width: 100%;
-            max-height: 150px;
+
+        button:hover:not(:disabled) {
+            background: #1a3a1a;
+        }
+
+        button:disabled {
+            border-color: #333;
+            color: #444;
+            cursor: not-allowed;
+        }
+
+        button.danger {
+            border-color: #f00;
+            color: #f00;
+        }
+
+        button.danger:hover:not(:disabled) {
+            background: #2a0000;
+        }
+
+        /* Activity log */
+        #log {
+            max-height: 160px;
             overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.8rem;
-            color: #888;
+            font-size: 0.78rem;
+            line-height: 1.6;
         }
-        .log .entry { margin: 2px 0; }
-        .log .entry.open { color: #4caf50; }
-        .log .entry.close { color: #f44336; }
-        .log .entry.error { color: #ff9800; }
+
+        .log-entry { color: #555; }
+        .log-entry.open { color: #0f0; }
+        .log-entry.close { color: #f44; }
+        .log-entry.error { color: #f80; }
     </style>
 </head>
 <body>
-    <h1>Valve Controller</h1>
 
-    <div class="status-bar">
-        <div class="state idle" id="state">IDLE</div>
-        <div class="timer" id="timer">--:--</div>
+    <header>
+        <h1>[ VALVE CONTROLLER ]</h1>
+        <span id="connection-indicator">ONLINE</span>
+    </header>
+
+    <div id="status-bar">
+        <span id="status-text">IDLE</span>
+        <span id="timer">--:--</span>
     </div>
 
-    <div class="zones" id="zones"></div>
+    <div id="zones"></div>
 
-    <div class="log" id="log"></div>
+    <div class="panel" style="margin-top: 15px;">
+        <div class="panel-title">Activity Log</div>
+        <div id="log"></div>
+    </div>
 
     <script>
         const BASE = '';
-        let pollInterval;
         let currentStatus = null;
+        let sseSource = null;
+        let fallbackInterval = null;
+        let knownZones = [];
 
-        function log(msg, cls) {
-            const el = document.getElementById('log');
+        // --- Connection indicator ---
+        function setOnline(online) {
+            const el = document.getElementById('connection-indicator');
+            el.textContent = online ? 'ONLINE' : 'OFFLINE';
+            el.className = online ? '' : 'offline';
+        }
+
+        // --- Logging ---
+        function addLog(msg, cls) {
+            const log = document.getElementById('log');
             const t = new Date().toLocaleTimeString();
-            el.innerHTML = `<div class="entry ${cls || ''}">[${t}] ${msg}</div>` + el.innerHTML;
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${cls || ''}`;
+            entry.textContent = `[${t}] ${msg}`;
+            log.insertBefore(entry, log.firstChild);
+            if (log.children.length > 60) log.removeChild(log.lastChild);
         }
 
-        async function fetchStatus() {
-            try {
-                const r = await fetch(`${BASE}/api/status`);
-                currentStatus = await r.json();
-                updateUI(currentStatus);
-            } catch (e) {
-                document.getElementById('state').textContent = 'CONNECTION ERROR';
-                document.getElementById('state').className = 'state';
-            }
+        // --- Timer formatting ---
+        function formatTime(secs) {
+            const s = Math.ceil(secs);
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
         }
 
+        // --- UI update from status object ---
         function updateUI(s) {
-            const stateEl = document.getElementById('state');
+            const statusBar = document.getElementById('status-bar');
+            const statusText = document.getElementById('status-text');
             const timerEl = document.getElementById('timer');
 
             if (s.active) {
-                stateEl.textContent = `ZONE ${s.active_zone} ACTIVE`;
-                stateEl.className = 'state active';
-                const rem = Math.ceil(s.remaining_seconds);
-                const m = Math.floor(rem / 60);
-                const sec = rem % 60;
-                timerEl.textContent = `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+                statusBar.className = 'active';
+                statusText.textContent = `ZONE ${s.active_zone} ACTIVE`;
+                timerEl.textContent = formatTime(s.remaining_seconds);
             } else {
-                stateEl.textContent = 'IDLE';
-                stateEl.className = 'state idle';
+                statusBar.className = '';
+                statusText.textContent = 'IDLE';
                 timerEl.textContent = '--:--';
             }
 
             renderZones(s);
         }
 
+        // --- Zone panels ---
         function renderZones(s) {
             const container = document.getElementById('zones');
-            if (container.children.length === s.zones.length) {
-                s.zones.forEach(z => {
-                    const card = document.getElementById(`zone-${z}`);
-                    if (!card) return;
-                    const isActive = s.active && s.active_zone === z;
-                    card.className = `zone-card${isActive ? ' active' : ''}`;
-                    const openBtn = card.querySelector('.btn-open');
-                    const closeBtn = card.querySelector('.btn-close');
-                    if (openBtn) openBtn.disabled = s.active;
-                    if (closeBtn) closeBtn.style.display = isActive ? 'inline-block' : 'none';
-                });
-                return;
-            }
+            const zones = s.zones || knownZones;
 
-            container.innerHTML = '';
-            s.zones.forEach(z => {
+            // Build or update panels
+            zones.forEach(z => {
                 const isActive = s.active && s.active_zone === z;
-                const card = document.createElement('div');
-                card.id = `zone-${z}`;
-                card.className = `zone-card${isActive ? ' active' : ''}`;
-                card.innerHTML = `
-                    <h3>Zone</h3>
-                    <div class="zone-num">${z}</div>
-                    <div class="duration-input">
-                        <label>sec:</label>
-                        <input type="number" id="dur-${z}" value="60" min="1" max="3600">
-                    </div>
-                    <button class="btn-open" onclick="openValve('${z}')" ${s.active ? 'disabled' : ''}>OPEN</button>
-                    <button class="btn-close" onclick="closeValve('${z}')" style="display:${isActive ? 'inline-block' : 'none'}">CLOSE</button>
-                `;
-                container.appendChild(card);
+                let panel = document.getElementById(`zone-${z}`);
+
+                if (!panel) {
+                    panel = document.createElement('div');
+                    panel.id = `zone-${z}`;
+                    panel.innerHTML = `
+                        <div class="zone-header">
+                            <span class="zone-number">ZONE ${z}</span>
+                            <span class="zone-status">
+                                <span class="dot" id="dot-${z}"></span>
+                                <span class="zone-status-text" id="zst-${z}">CLOSED</span>
+                            </span>
+                        </div>
+                        <div class="zone-controls">
+                            <div class="duration-row">
+                                <label>SEC:</label>
+                                <input type="number" id="dur-${z}" value="60" min="1" max="3600">
+                            </div>
+                            <div class="btn-row">
+                                <button id="open-btn-${z}" onclick="openValve('${z}')">OPEN</button>
+                                <button id="close-btn-${z}" class="danger" onclick="closeValve('${z}')" style="display:none">CLOSE</button>
+                            </div>
+                        </div>
+                    `;
+                    panel.className = 'zone-panel';
+                    container.appendChild(panel);
+                }
+
+                panel.className = `zone-panel${isActive ? ' active' : ''}`;
+                const openBtn = document.getElementById(`open-btn-${z}`);
+                const closeBtn = document.getElementById(`close-btn-${z}`);
+                const zst = document.getElementById(`zst-${z}`);
+
+                if (openBtn) openBtn.disabled = s.active;
+                if (closeBtn) closeBtn.style.display = isActive ? 'inline-block' : 'none';
+                if (zst) zst.textContent = isActive ? 'OPEN' : 'CLOSED';
             });
+
+            knownZones = zones;
         }
 
+        // --- Fetch full status ---
+        async function fetchStatus() {
+            try {
+                const r = await fetch(`${BASE}/api/status`);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                currentStatus = await r.json();
+                setOnline(true);
+                updateUI(currentStatus);
+            } catch (e) {
+                setOnline(false);
+            }
+        }
+
+        // --- Load config once to know zones ---
+        async function fetchConfig() {
+            try {
+                const r = await fetch(`${BASE}/api/config`);
+                if (!r.ok) return;
+                const cfg = await r.json();
+                knownZones = cfg.zones || [];
+            } catch (_) {}
+        }
+
+        // --- Open / Close actions ---
         async function openValve(zone) {
-            const dur = document.getElementById(`dur-${zone}`).value;
-            if (!dur || dur <= 0) { log('Invalid duration', 'error'); return; }
+            const durInput = document.getElementById(`dur-${zone}`);
+            const dur = parseFloat(durInput.value);
+            if (!dur || dur <= 0) { addLog('Invalid duration', 'error'); return; }
             try {
                 const r = await fetch(`${BASE}/api/valve/${zone}/open?duration=${dur}`, {method: 'POST'});
                 const d = await r.json();
                 if (d.success) {
-                    log(`Zone ${zone} opened for ${dur}s`, 'open');
+                    addLog(`Zone ${zone} opened for ${dur}s`, 'open');
                 } else {
-                    log(`${d.message}: ${JSON.stringify(d)}`, 'error');
+                    addLog(`${d.message}: ${JSON.stringify(d)}`, 'error');
                 }
                 fetchStatus();
             } catch (e) {
-                log('Request failed: ' + e, 'error');
+                addLog('Request failed: ' + e, 'error');
             }
         }
 
@@ -248,18 +402,63 @@
                 const r = await fetch(`${BASE}/api/valve/${zone}/close`, {method: 'POST'});
                 const d = await r.json();
                 if (d.success) {
-                    log(`Zone ${zone} closed`, 'close');
+                    addLog(`Zone ${zone} closed (${d.elapsed_seconds}s elapsed)`, 'close');
                 } else {
-                    log(`${d.message}`, 'error');
+                    addLog(d.message, 'error');
                 }
                 fetchStatus();
             } catch (e) {
-                log('Request failed: ' + e, 'error');
+                addLog('Request failed: ' + e, 'error');
             }
         }
 
-        fetchStatus();
-        pollInterval = setInterval(fetchStatus, 1000);
+        // --- SSE connection ---
+        function startSSE() {
+            if (sseSource) sseSource.close();
+
+            sseSource = new EventSource(`${BASE}/events`);
+
+            sseSource.addEventListener('init', (e) => {
+                const s = JSON.parse(e.data);
+                setOnline(true);
+                updateUI(s);
+                // SSE working — cancel fallback poll
+                if (fallbackInterval) {
+                    clearInterval(fallbackInterval);
+                    fallbackInterval = null;
+                }
+            });
+
+            sseSource.onmessage = (e) => {
+                const evt = JSON.parse(e.data);
+                if (evt.event === 'valve_change') {
+                    const label = evt.state === 'open'
+                        ? `Zone ${evt.zone} opened`
+                        : `Zone ${evt.zone} closed`;
+                    addLog(label, evt.state === 'open' ? 'open' : 'close');
+                }
+                // Refresh full status after event
+                fetchStatus();
+            };
+
+            sseSource.onerror = () => {
+                setOnline(false);
+                sseSource.close();
+                sseSource = null;
+                // Fall back to polling every 5s
+                if (!fallbackInterval) {
+                    fallbackInterval = setInterval(fetchStatus, 5000);
+                    // Try to reconnect SSE after 10s
+                    setTimeout(startSSE, 10000);
+                }
+            };
+        }
+
+        // --- Boot sequence ---
+        fetchConfig().then(() => {
+            fetchStatus();
+            startSSE();
+        });
     </script>
 </body>
 </html>
