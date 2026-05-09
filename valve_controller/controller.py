@@ -65,7 +65,7 @@ class ValveController:
 
             self.relay.set_relay(zone, True)
             self._active_zone = zone
-            self._open_time = time.time()
+            self._open_time = time.monotonic()
             self._duration = duration
 
             self._active_timer = threading.Timer(duration, self._auto_close)
@@ -97,7 +97,7 @@ class ValveController:
     def _do_close(self):
         """Internal close (must be called with lock held)."""
         zone = self._active_zone
-        elapsed = time.time() - self._open_time if self._open_time else 0
+        elapsed = time.monotonic() - self._open_time if self._open_time else 0
 
         if self._active_timer:
             self._active_timer.cancel()
@@ -145,7 +145,7 @@ class ValveController:
                 }
             else:
                 remaining = self._remaining_time()
-                elapsed = time.time() - self._open_time
+                elapsed = time.monotonic() - self._open_time
                 return {
                     "active": True,
                     "active_zone": self._active_zone,
@@ -159,7 +159,7 @@ class ValveController:
         """Calculate remaining time (must be called with lock held)."""
         if self._open_time is None or self._duration is None:
             return 0
-        elapsed = time.time() - self._open_time
+        elapsed = time.monotonic() - self._open_time
         return max(0, self._duration - elapsed)
 
     def shutdown(self):

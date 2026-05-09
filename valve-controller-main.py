@@ -27,7 +27,13 @@ def main():
 
     ValveRequestHandler.controller = controller
 
+    shutting_down = False
+
     def shutdown_handler(signum, frame):
+        nonlocal shutting_down
+        if shutting_down:
+            return
+        shutting_down = True
         logger.info(f"Received signal {signum}, shutting down...")
         controller.shutdown()
         sys.exit(0)
@@ -44,7 +50,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        controller.shutdown()
+        if not shutting_down:
+            controller.shutdown()
         server.server_close()
 
 

@@ -78,7 +78,15 @@ class ValveRequestHandler(BaseHTTPRequestHandler):
                     self._send_json(400, {"error": "Invalid duration value"})
                     return
 
+                logger.warning(
+                    f"OPEN REQUEST from {self.client_address[0]} — "
+                    f"zone={zone}, duration={duration}s"
+                )
                 success, code, message, detail = self.controller.open_valve(zone, duration)
+                logger.warning(
+                    f"OPEN RESULT for {self.client_address[0]} — "
+                    f"zone={zone}, code={code}, message={message}, detail={detail}"
+                )
                 self._send_json(code, {"success": success, "message": message, **detail})
                 return
 
