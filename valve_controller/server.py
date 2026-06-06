@@ -12,6 +12,11 @@ class ValveRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for valve controller API."""
 
     controller = None  # Set by main before starting server
+    # Enable HTTP keep-alive so the irrigation manager reuses one warm TCP
+    # connection instead of reconnecting per command. Safe here: every response
+    # already sends Content-Length (_send_json/_send_html), OPTIONS is 204, and
+    # the SSE /events stream is long-lived.
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, format, *args):
         logger.info(f"{self.client_address[0]} - {format % args}")

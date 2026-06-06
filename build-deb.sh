@@ -2,7 +2,7 @@
 set -e
 
 PACKAGE="valve-controller"
-VERSION="1.0.0"
+VERSION="1.0.1"
 ARCH="all"
 BUILD_DIR="${PACKAGE}_${VERSION}_${ARCH}"
 
