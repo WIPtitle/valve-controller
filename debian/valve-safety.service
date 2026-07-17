@@ -1,0 +1,13 @@
+[Unit]
+Description=Force all relays OFF at boot (safety)
+DefaultDependencies=no
+After=sysinit.target
+Before=valve-controller.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/bin/sh -c 'modprobe i2c-dev 2>/dev/null; sleep 1; i2cset -y 1 0x10 0x01 0x00; i2cset -y 1 0x10 0x02 0x00; i2cset -y 1 0x10 0x03 0x00; i2cset -y 1 0x10 0x04 0x00 || true'
+
+[Install]
+WantedBy=multi-user.target

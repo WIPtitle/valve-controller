@@ -2,7 +2,7 @@
 set -e
 
 PACKAGE="valve-controller"
-VERSION="1.0.1"
+VERSION="1.2.0"
 ARCH="all"
 BUILD_DIR="${PACKAGE}_${VERSION}_${ARCH}"
 
@@ -27,8 +27,9 @@ cp valve_controller/*.py "$BUILD_DIR/usr/lib/${PACKAGE}/valve_controller/"
 # Copy web UI
 cp web/index.html "$BUILD_DIR/usr/lib/${PACKAGE}/web/"
 
-# Copy systemd unit
+# Copy systemd units
 cp debian/valve-controller.service "$BUILD_DIR/lib/systemd/system/"
+cp debian/valve-safety.service "$BUILD_DIR/lib/systemd/system/"
 
 # Copy docs
 echo "$VERSION" > "$BUILD_DIR/usr/share/doc/${PACKAGE}/VERSION"
@@ -44,10 +45,10 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: python3 (>= 3.7), systemd, python3-rpi.gpio
+Depends: python3 (>= 3.7), systemd, python3-smbus2, i2c-tools
 Maintainer: Matteo Galvagni <galvagni.matteo@protonmail.com>
 Description: Valve Controller Service
- Controls solenoid valves via GeeekPi 4-relay board on Raspberry Pi.
+ Controls solenoid valves via GeeekPi EP-0099 I2C relay board on Raspberry Pi.
  REST API with mutual exclusion, timed auto-close, and web dashboard.
 EOF
 
@@ -65,19 +66,14 @@ if [ ! -f "$CONFIG_FILE" ]; then
     cat > "$CONFIG_FILE" << 'CONF'
 {
   "port": 8890,
-  "relay_pins": {
-    "1": 21,
-    "2": 20,
-    "3": 16,
-    "4": 12
-  },
-  "active_low": true
+  "i2c_address": "0x10"
 }
 CONF
     echo "Created default config at $CONFIG_FILE"
 fi
 
 systemctl daemon-reload
+systemctl enable valve-safety
 systemctl enable valve-controller
 systemctl start valve-controller
 
@@ -91,6 +87,7 @@ cat > "$BUILD_DIR/DEBIAN/prerm" << 'EOF'
 set -e
 systemctl stop valve-controller || true
 systemctl disable valve-controller || true
+systemctl disable valve-safety || true
 EOF
 chmod 755 "$BUILD_DIR/DEBIAN/prerm"
 

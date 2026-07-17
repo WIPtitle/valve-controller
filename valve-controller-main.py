@@ -42,6 +42,13 @@ def main():
     signal.signal(signal.SIGINT, shutdown_handler)
 
     ThreadingTCPServer.allow_reuse_address = True
+    # The default listen backlog (request_queue_size=5) overflows when the flaky
+    # WiFi link stalls and the .101 poller piles up connections (observed SYN
+    # flooding / cookies on :8686). A larger backlog lets pending requests queue
+    # instead of being reset, so control commands (incl. the manager force-close)
+    # are far less likely to be dropped.
+    ThreadingTCPServer.request_queue_size = 128
+    ThreadingTCPServer.daemon_threads = True
     server = ThreadingTCPServer(("0.0.0.0", config.port), ValveRequestHandler)
 
     logger.info(f"Valve Controller listening on http://0.0.0.0:{config.port}")

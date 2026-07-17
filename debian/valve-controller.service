@@ -1,11 +1,17 @@
 [Unit]
 Description=Valve Controller Service
 After=network.target
+ConditionPathExists=/dev/i2c-1
 
 [Service]
 Type=simple
 User=root
+
+# Safety: force all relays OFF before starting and after stopping/crashing
+ExecStartPre=/bin/sh -c 'modprobe i2c-dev 2>/dev/null; sleep 0.5; i2cset -y 1 0x10 0x01 0x00; i2cset -y 1 0x10 0x02 0x00; i2cset -y 1 0x10 0x03 0x00; i2cset -y 1 0x10 0x04 0x00'
 ExecStart=/usr/bin/python3 /usr/lib/valve-controller/valve-controller-main.py
+ExecStopPost=/bin/sh -c 'i2cset -y 1 0x10 0x01 0x00; i2cset -y 1 0x10 0x02 0x00; i2cset -y 1 0x10 0x03 0x00; i2cset -y 1 0x10 0x04 0x00 2>/dev/null || true'
+
 Restart=on-failure
 RestartSec=5
 Environment="PYTHONUNBUFFERED=1"

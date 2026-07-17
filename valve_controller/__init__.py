@@ -3,4 +3,4 @@ from valve_controller.relay import RelayController
 from valve_controller.controller import ValveController
 from valve_controller.server import ValveRequestHandler
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
