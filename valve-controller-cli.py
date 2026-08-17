@@ -5,6 +5,7 @@ import sys
 import os
 import subprocess
 import json
+import tempfile
 
 SERVICE_NAME = "valve-controller"
 CONFIG_PATH = os.environ.get("VALVE_CONTROLLER_CONFIG_PATH", "/etc/valve-controller/config.json")
@@ -19,9 +20,29 @@ def load_config():
 
 
 def save_config(config):
-    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(config, f, indent=2)
+    # Crash-safe atomic write (temp + fsync + rename + dir fsync): a power cut
+    # leaves either the complete old or the complete new config, never a torn one.
+    directory = os.path.dirname(CONFIG_PATH) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".config-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(config, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, CONFIG_PATH)
+        dir_fd = os.open(directory, os.O_DIRECTORY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def run_cmd(cmd):
