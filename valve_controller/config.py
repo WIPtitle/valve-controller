@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 
 DEFAULT_CONFIG_PATH = "/etc/valve-controller/config.json"
 DEFAULT_CONFIG = {
@@ -18,11 +19,38 @@ def load_config(path=None):
         return DEFAULT_CONFIG.copy()
 
 
+def _atomic_write_json(path, data):
+    """Crash-safe JSON write: temp file + fsync + atomic rename + dir fsync.
+
+    On power loss the target is left as either the complete old file or the
+    complete new one -- never truncated.
+    """
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".config-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, path)
+        dir_fd = os.open(directory, os.O_DIRECTORY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def save_config(config, path=None):
     config_path = path or os.environ.get("VALVE_CONTROLLER_CONFIG_PATH", DEFAULT_CONFIG_PATH)
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
+    _atomic_write_json(config_path, config)
 
 
 class ConfigManager:
